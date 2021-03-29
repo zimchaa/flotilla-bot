@@ -28,21 +28,23 @@ intCurrentThrust = 0
 global intCurrentDiff
 intCurrentDiff = 0
 
-if modMotorLeft.is_a(flotilla.Motor):
-    print("Left Motor - check")
-    blnMotor = True
+if modMotorLeft is None:
+    print("Left Motor - error")
+    blnMotor = False
     intMotorLeftSpeed = 0
 else:
-    print("Left Motor - error")
-    blnMotor = False
-    
-if modMotorRight.is_a(flotilla.Motor):
-    print("Right Motor - check")
+    print("Left Motor - check")
     blnMotor = True
+    intLeftMotorSpeed = 0
+    
+if modMotorRight is None:
+    print("Right Motor - error")
+    blnMotor = False
     intMotorRightSpeed = 0
 else:
-    print("Left Motor - error")
-    blnMotor = False
+    print("Left Motor - check")
+    blnMotor = True
+    intMotorRightSpeed = 0
 
 if modMotion is None:
     print("Motion / Telemetry - error")
@@ -102,7 +104,7 @@ def motor_speed_calc(intNewThrust, intNewDiff):
 
 @put('/rainbow/<numPixel:int>')
 @put('/rainbow/<numPixel:int>/<intRed:int>/<intGreen:int>/<intBlue:int>/<fltBrightness:float>')
-def light_handler(numPixel = 6, intRed = 255, intGreen = 255, intBlue = 255, fltBrightness = 1.0):
+def light_handler(numPixel = 6, intRed = 255, intGreen = 255, intBlue = 255, fltBrightness = 150.0):
     
     try:
         if blnRainbow:
@@ -137,32 +139,44 @@ def light_handler(numPixel = 6, intRed = 255, intGreen = 255, intBlue = 255, flt
     
     response.headers['Content-Type'] = 'application/json'
     return json.dumps({"pixels": modRainbow.pixels, "brightness": modRainbow.brightness})
-    
 
-@get('/vision/<intCamera:int>')
-def vision_handler(intCamera):
-    '''Probably run by the other thing'''
-    pass
 
 @get('/telemetry')
 def telemetry_handler():
     
     #initialise varTelemetry
-    varTelemetry = {"x": 0, "y": 0, "z": 0, "heading": 0}
+    varTelemetry = {"x": 0, "y": 0, "z": 0, "heading": 0, "motorspeeds": {"left": 0, "right": 0}, "status": "bad"}
     
+    if blnMotor:
+        dictMotorSpeeds = {"left": modMotorLeft.speed, "right": modMotorRight.speed}
+    else:
+        dictMotorSpeeds = {"left": 0, "right": 0}
+
     try:
         #parse input
         if blnMotion:
-            varTelemetry = {"x": modMotion.x, "y": modMotion.y, "z": modMotion.z, "heading": modMotion.heading}
+            varTelemetry = {"x": modMotion.x, "y": modMotion.y, "z": modMotion.z, "heading": modMotion.heading, "motorspeeds": dictMotorSpeeds, "status": "good"}
+        # else: 
+            # print("blnMotion: {} / blnMotor: {}".format(blnMotion, blnMotor))
 
     except:
         print("motion error, returning defaults")
         
-    
     response.headers['Content-Type'] = 'application/json'
     return json.dumps(varTelemetry)        
         
-@put('/thrust/<intThrust:int>')
+@get('/thrust/')
+def get_thrust_handler():
+
+    response.headers['Content-Type'] = 'application/json'
+    return json.dumps({"thrust": intCurrentThrust})
+
+@get('/diff/')
+def get_diff_handler():
+
+    response.headers['Content-Type'] = 'application/json'
+    return json.dumps({"diff": intCurrentDiff})
+
 @put('/thrust/<intThrust:int>/diff/<intDiff:int>')
 def thrustdiff_handler(intThrust = 0, intDiff = 0):
     
@@ -183,6 +197,10 @@ def thrustdiff_handler(intThrust = 0, intDiff = 0):
             
             varThrustDiff = {"motorspeeds": newSpeeds, "thrust": intThrust, "diff": intDiff}
             
+            # set the global vars to be returned
+            intCurrentThrust = intThrust
+            intCurrentDiff = intDiff
+
         else:
             print("No motors")
 
